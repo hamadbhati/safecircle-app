@@ -1,0 +1,5 @@
+commandlinetools*.zip
+*.tar.xz
+*.zip
+android-sdk/
+flutter/
