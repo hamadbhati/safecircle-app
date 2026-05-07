@@ -20,9 +20,35 @@ jobs:
           cp safecircle_clean/pubspec.yaml safecircle_app/
           cp safecircle/android/app/google-services.json safecircle_app/android/app/
           mkdir -p safecircle_app/assets/images
-          sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.22"/' safecircle_app/android/build.gradle
-          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/' safecircle_app/android/app/build.gradle
-          sed -i '/defaultConfig {/a\            multiDexEnabled true' safecircle_app/android/app/build.gradle
+      - name: Fix Android config
+        run: |
+          cd safecircle_app
+          sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.22"/' android/build.gradle
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/' android/app/build.gradle
+          cat > android/settings.gradle << 'GRADLE'
+pluginManagement {
+    def flutterSdkPath = {
+        def properties = new Properties()
+        file("local.properties").withInputStream { properties.load(it) }
+        def flutterSdkPath = properties.getProperty("flutter.sdk")
+        assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+        return flutterSdkPath
+    }()
+    includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+plugins {
+    id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+    id "com.android.application" version "8.1.0" apply false
+    id "org.jetbrains.kotlin.android" version "1.9.22" apply false
+    id "com.google.gms.google-services" version "4.4.0" apply false
+}
+include ":app"
+GRADLE
       - name: Build APK
         run: cd safecircle_app && flutter pub get && flutter build apk --debug
       - uses: actions/upload-artifact@v4
