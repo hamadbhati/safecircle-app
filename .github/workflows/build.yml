@@ -1,29 +1,139 @@
 name: Build SafeCircle APK
-on: [push]
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-      - uses: subosito/flutter-action@v2
+
+      - name: Set up Flutter 3.24
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.0'
           channel: 'stable'
-      - name: Create Flutter project
-        run: flutter create safecircle_app
-      - name: Copy files
+          cache: true
+
+      - name: Create assets directory
+        run: mkdir -p assets/images
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Scaffold android folder
         run: |
-          cp -r safecircle_clean/lib/* safecircle_app/lib/
-          cp safecircle_clean/pubspec.yaml safecircle_app/
-          cp safecircle/android/app/google-services.json safecircle_app/android/app/
-          mkdir -p safecircle_app/assets/images
+          if [ ! -d "android" ]; then
+            flutter create --project-name safecircle \
+                           --org com.datanura.safecircle \
+                           --platforms android \
+                           . --overwrite
+          fi
+
+      - name: Patch project build.gradle
+        run: |
+          cat > android/build.gradle << 'EOF'
+          buildscript {
+              ext.kotlin_version = '1.9.22'
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:8.5.2'
+                  classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+                  classpath 'com.google.gms:google-services:4.4.2'
+              }
+          }
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.buildDir = '../build'
+          subprojects {
+              project.buildDir = "${rootProject.buildDir}/${project.name}"
+          }
+          subprojects {
+              project.evaluationDependsOn(':app')
+          }
+          tasks.register("clean", Delete) {
+              delete rootProject.buildDir
+          }
+          EOF
+
+      - name: Patch app build.gradle
+        run: |
+          cat > android/app/build.gradle << 'EOF'
+          plugins {
+              id "com.android.application"
+              id "kotlin-android"
+              id "dev.flutter.flutter-gradle-plugin"
+              id "com.google.gms.google-services"
+          }
+          android {
+              namespace "com.datanura.safecircle"
+              compileSdk = 35
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+              kotlinOptions {
+                  jvmTarget = '17'
+              }
+              defaultConfig {
+                  applicationId "com.datanura.safecircle"
+                  minSdk = 23
+                  targetSdk = 35
+                  versionCode = 1
+                  versionName = "1.0.0"
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.debug
+                      minifyEnabled false
+                      shrinkResources false
+                  }
+              }
+          }
+          flutter {
+              source '../..'
+          }
+          EOF
+
+      - name: Set Gradle version
+        run: |
+          mkdir -p android/gradle/wrapper
+          cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.10.2-bin.zip
+          EOF
+
+      - name: Write google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+
       - name: Build APK
-        run: cd safecircle_app && flutter pub get && flutter build apk --debug
-      - uses: actions/upload-artifact@v4
+        run: flutter build apk --debug --verbose
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: SafeCircle-APK
-          path: safecircle_app/build/app/outputs/flutter-apk/app-debug.apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
