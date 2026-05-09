@@ -39,7 +39,7 @@ jobs:
         run: |
           if [ ! -d "android" ]; then
             flutter create --project-name safecircle \
-                           --org com.datanura.safecircle \
+                           --org com.safecircle \
                            --platforms android \
                            . --overwrite
           fi
@@ -87,7 +87,7 @@ jobs:
               id "com.google.gms.google-services"
           }
           android {
-              namespace "com.datanura.safecircle"
+              namespace "com.safecircle.app"
               compileSdk = 35
               compileOptions {
                   sourceCompatibility JavaVersion.VERSION_17
@@ -97,7 +97,7 @@ jobs:
                   jvmTarget = '17'
               }
               defaultConfig {
-                  applicationId "com.datanura.safecircle"
+                  applicationId "com.safecircle.app"
                   minSdk = 23
                   targetSdk = 35
                   versionCode = 1
@@ -139,4 +139,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SafeCircle-APK
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          path: safecircle_clean/build/app/outputs/flutter-apk/app-debug.apk
