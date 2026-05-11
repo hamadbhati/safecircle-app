@@ -1,150 +1,126 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'dart:math';
+import 'package:uuid/uuid.dart';
+import '../models/user_model.dart';
 
 class FamilyService extends ChangeNotifier {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  List<UserModel> _children = [];
+  List<UserModel> get children => _children;
   String? _familyId;
   String? get familyId => _familyId;
 
-  // Generate invite code and save to Firestore
-  Future<String> generateInviteCode() async {
-    final user = _auth.currentUser;
-    if (user == null) return '';
-
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    final random = Random();
-    final code = List.generate(6, (i) => chars[random.nextInt(chars.length)]).join();
-    final fullCode = 'SC-$code';
-
-    // Save code to Firestore with 24hr expiry
-    await _firestore.collection('invite_codes').doc(fullCode).set({
-      'guardianId': user.uid,
-      'guardianName': user.displayName ?? 'Guardian',
-      'createdAt': FieldValue.serverTimestamp(),
-      'expiresAt': Timestamp.fromDate(DateTime.now().add(const Duration(hours: 24))),
+  Future<String> createFamilyAndGetInviteLink() async {
+    final uid = _auth.currentUser!.uid;
+    final familyId = const Uuid().v4();
+    _familyId = familyId;
+    await _db.collection('families').doc(familyId).set({
+      'guardianId': uid,
+      'createdAt': DateTime.now().millisecondsSinceEpoch,
+      'members': [],
+    });
+    await _db.collection('users').doc(uid).update({'familyId': familyId});
+    final inviteToken = const Uuid().v4().substring(0, 8).toUpperCase();
+    await _db.collection('invites').doc(inviteToken).set({
+      'familyId': familyId,
+      'guardianId': uid,
+      'createdAt': DateTime.now().millisecondsSinceEpoch,
       'used': false,
     });
-
-    return fullCode;
+    notifyListeners();
+    return 'https://safecircle.app/join/$inviteToken';
   }
 
-  // Join family using invite code
-  Future<Map<String, dynamic>?> joinWithCode(String code) async {
-    final user = _auth.currentUser;
-    if (user == null) return null;
-
+  Future<String?> joinFamily(String inviteToken) async {
     try {
-      final codeDoc = await _firestore.collection('invite_codes').doc(code).get();
-
-      if (!codeDoc.exists) return {'error': 'Code nahi mila'};
-
-      final data = codeDoc.data()!;
-
-      // Check if expired
-      final expiresAt = (data['expiresAt'] as Timestamp).toDate();
-      if (DateTime.now().isAfter(expiresAt)) {
-        return {'error': 'Code expire ho gaya. Naya code mangein.'};
-      }
-
-      // Check if already used
-      if (data['used'] == true) {
-        return {'error': 'Yeh code pehle use ho chuka hai.'};
-      }
-
-      final guardianId = data['guardianId'];
-      final guardianName = data['guardianName'];
-
-      // Create family connection
-      final familyRef = await _firestore.collection('families').add({
-        'guardianId': guardianId,
-        'members': [user.uid],
-        'createdAt': FieldValue.serverTimestamp(),
+      final token = inviteToken.split('/').last.toUpperCase();
+      final inviteDoc = await _db.collection('invites').doc(token).get();
+      if (!inviteDoc.exists) return 'Invalid invite link';
+      if (inviteDoc.data()!['used'] == true) return 'Invite already used';
+      final familyId = inviteDoc.data()!['familyId'];
+      final uid = _auth.currentUser!.uid;
+      await _db.collection('users').doc(uid).update({'familyId': familyId});
+      await _db.collection('families').doc(familyId).update({
+        'members': FieldValue.arrayUnion([uid]),
       });
-
-      _familyId = familyRef.id;
-
-      // Update member record
-      await _firestore.collection('users').doc(user.uid).update({
-        'familyId': familyRef.id,
-        'guardianId': guardianId,
-        'role': 'member',
-      });
-
-      // Mark code as used
-      await _firestore.collection('invite_codes').doc(code).update({'used': true});
-
+      await _db.collection('invites').doc(token).update({'used': true});
+      _familyId = familyId;
       notifyListeners();
-      return {'success': true, 'guardianName': guardianName};
+      return null;
     } catch (e) {
-      return {'error': 'Masla hua. Dobara try karein.'};
+      return e.toString();
     }
   }
 
-  // Get family members for guardian
-  Stream<List<Map<String, dynamic>>> getFamilyMembers() {
-    final user = _auth.currentUser;
-    if (user == null) return const Stream.empty();
-
-    return _firestore
-        .collection('families')
-        .where('guardianId', isEqualTo: user.uid)
-        .snapshots()
-        .map((snapshot) {
-      if (snapshot.docs.isEmpty) return [];
-      return snapshot.docs.map((doc) => doc.data()).toList();
-    });
+  Future<void> loadChildren(String familyId) async {
+    _familyId = familyId;
+    final familyDoc = await _db.collection('families').doc(familyId).get();
+    if (!familyDoc.exists) return;
+    final memberIds = List<String>.from(familyDoc.data()!['members'] ?? []);
+    _children = [];
+    for (final memberId in memberIds) {
+      final userDoc = await _db.collection('users').doc(memberId).get();
+      if (userDoc.exists) {
+        _children.add(UserModel.fromMap(userDoc.data()!));
+      }
+    }
+    notifyListeners();
   }
 
-  // Save activity data for member
-  Future<void> saveActivity(Map<String, dynamic> activity) async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-
-    await _firestore
-        .collection('activities')
-        .doc(user.uid)
-        .collection('daily')
-        .add({
-      ...activity,
-      'timestamp': FieldValue.serverTimestamp(),
-    });
+  Stream<LocationModel?> getChildLocation(String childId) {
+    return _db.collection('locations').doc(childId).snapshots()
+        .map((doc) => doc.exists ? LocationModel.fromMap(doc.data()!) : null);
   }
 
-  // Send alert to guardian
-  Future<void> sendAlert({
-    required String memberId,
-    required String guardianId,
-    required String alertType,
-    required String message,
-    required String level,
-  }) async {
-    await _firestore.collection('alerts').add({
-      'memberId': memberId,
-      'guardianId': guardianId,
-      'type': alertType,
-      'message': message,
-      'level': level,
-      'read': false,
-      'timestamp': FieldValue.serverTimestamp(),
-    });
-  }
-
-  // Get alerts for guardian
-  Stream<List<Map<String, dynamic>>> getAlerts() {
-    final user = _auth.currentUser;
-    if (user == null) return const Stream.empty();
-
-    return _firestore
-        .collection('alerts')
-        .where('guardianId', isEqualTo: user.uid)
+  Stream<List<AlertModel>> getAlerts(String familyId) {
+    return _db.collection('alerts')
+        .where('familyId', isEqualTo: familyId)
         .orderBy('timestamp', descending: true)
         .limit(50)
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList());
+        .map((snap) => snap.docs.map((d) => AlertModel.fromMap(d.data())).toList());
+  }
+
+  Future<List<AppUsageModel>> getAppUsage(String childId, DateTime date) async {
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+    final snap = await _db.collection('app_usage')
+        .where('childId', isEqualTo: childId)
+        .where('date', isGreaterThanOrEqualTo: startOfDay.millisecondsSinceEpoch)
+        .where('date', isLessThan: endOfDay.millisecondsSinceEpoch)
+        .get();
+    return snap.docs.map((d) => AppUsageModel.fromMap(d.data())).toList();
+  }
+
+  Future<void> toggleAppBlock(String childId, String packageName, bool block) async {
+    await _db.collection('app_blocks').doc('${childId}_$packageName').set({
+      'childId': childId,
+      'packageName': packageName,
+      'blocked': block,
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  Future<List<String>> getBlockedApps(String childId) async {
+    final snap = await _db.collection('app_blocks')
+        .where('childId', isEqualTo: childId)
+        .where('blocked', isEqualTo: true)
+        .get();
+    return snap.docs.map((d) => d.data()['packageName'] as String).toList();
+  }
+
+  Future<void> requestScreenshot(String childId) async {
+    await _db.collection('screenshot_requests').doc(childId).set({
+      'childId': childId,
+      'requestedAt': DateTime.now().millisecondsSinceEpoch,
+      'status': 'pending',
+    });
+  }
+
+  Future<void> markAlertRead(String alertId) async {
+    await _db.collection('alerts').doc(alertId).update({'isRead': true});
   }
 }

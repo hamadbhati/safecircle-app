@@ -5,9 +5,7 @@ import 'theme/app_theme.dart';
 import 'screens/shared/splash_screen.dart';
 import 'services/auth_service.dart';
 import 'services/family_service.dart';
-
-const String geminiApiKey = 'AIzaSyBK95RzJC1UhlawbXzOyy5bp0Wdto5CJ9k';
-const String mapsApiKey = 'AIzaSyAIEBxXQ5mxocGsSqxDvdLQay-vcG5f0CQ';
+import 'services/monitoring_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +30,7 @@ class SafeCircleApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthService()),
         ChangeNotifierProvider(create: (_) => FamilyService()),
+        ChangeNotifierProvider(create: (_) => MonitoringService()),
       ],
       child: MaterialApp(
         title: 'SafeCircle',

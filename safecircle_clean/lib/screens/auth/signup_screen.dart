@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
-import '../../theme/app_theme.dart';
-import '../../theme/app_strings.dart';
 import '../../services/auth_service.dart';
-import 'role_selection_screen.dart';
+import '../../theme/app_theme.dart';
+import '../guardian/guardian_dashboard.dart';
+import '../child/child_home.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -14,181 +13,117 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _isLoading = false;
-  bool _obscurePassword = true;
+  final _nameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  String _role = 'guardian';
+  bool _loading = false;
 
   Future<void> _signup() async {
-    if (_nameController.text.isEmpty ||
-        _emailController.text.isEmpty ||
-        _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppStrings.isUrdu
-              ? 'Sari maloomat bharein'
-              : 'Please fill all fields'),
-          backgroundColor: AppTheme.danger,
-        ),
-      );
+    if (_nameCtrl.text.isEmpty || _emailCtrl.text.isEmpty || _passCtrl.text.isEmpty) return;
+    setState(() => _loading = true);
+    final auth = context.read<AuthService>();
+    final error = await auth.signUp(
+      email: _emailCtrl.text.trim(),
+      password: _passCtrl.text,
+      name: _nameCtrl.text.trim(),
+      role: _role,
+    );
+    if (!mounted) return;
+    setState(() => _loading = false);
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: AppTheme.danger));
       return;
     }
-
-    setState(() => _isLoading = true);
-
-    final authService = Provider.of<AuthService>(context, listen: false);
-    final error = await authService.signup(
-      _nameController.text.trim(),
-      _emailController.text.trim(),
-      _passwordController.text,
-    );
-
-    setState(() => _isLoading = false);
-
-    if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: AppTheme.danger),
-      );
+    if (_role == 'guardian') {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const GuardianDashboard()));
     } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
-      );
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ChildHome()));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(gradient: AppTheme.bgGradient),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: AppTheme.darkBg,
+      appBar: AppBar(title: const Text('Register'), backgroundColor: AppTheme.darkBg),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Account Banayein', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white)),
+            const SizedBox(height: 8),
+            const Text('Apna role chunein', style: TextStyle(color: Colors.white54)),
+            const SizedBox(height: 32),
+            Row(
               children: [
-                const SizedBox(height: 20),
-
-                // Back Button
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: Icon(Icons.arrow_back_ios, color: AppTheme.accentBlue),
-                ),
-
-                const SizedBox(height: 20),
-
-                Text(
-                  AppStrings.signup,
-                  style: Theme.of(context).textTheme.headlineLarge,
-                ).animate().fadeIn(),
-
-                const SizedBox(height: 8),
-                Text(
-                  AppStrings.isUrdu
-                      ? 'SafeCircle family mein shaamil hon'
-                      : 'Join the SafeCircle family',
-                  style: TextStyle(color: AppTheme.grey),
-                ).animate().fadeIn(delay: 100.ms),
-
-                const SizedBox(height: 32),
-
-                // Name Field
-                TextField(
-                  controller: _nameController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: AppStrings.name,
-                    prefixIcon: Icon(Icons.person_outline, color: AppTheme.accentBlue),
-                  ),
-                ).animate().fadeIn(delay: 200.ms),
-
-                const SizedBox(height: 16),
-
-                // Email Field
-                TextField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: AppStrings.email,
-                    prefixIcon: Icon(Icons.email_outlined, color: AppTheme.accentBlue),
-                  ),
-                ).animate().fadeIn(delay: 300.ms),
-
-                const SizedBox(height: 16),
-
-                // Password Field
-                TextField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: AppStrings.password,
-                    prefixIcon: Icon(Icons.lock_outline, color: AppTheme.accentBlue),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                        color: AppTheme.grey,
-                      ),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                  ),
-                ).animate().fadeIn(delay: 400.ms),
-
-                const SizedBox(height: 32),
-
-                // Signup Button
-                SizedBox(
-                  width: double.infinity,
-                  child: GestureDetector(
-                    onTap: _isLoading ? null : _signup,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: AppTheme.primaryGradient,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      alignment: Alignment.center,
-                      child: _isLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : Text(
-                              AppStrings.signup,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                    ),
-                  ),
-                ).animate().fadeIn(delay: 500.ms),
-
-                const SizedBox(height: 24),
-
-                // Login Link
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(AppStrings.haveAccount,
-                        style: TextStyle(color: AppTheme.grey)),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(
-                        AppStrings.login,
-                        style: TextStyle(
-                          color: AppTheme.accentBlue,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ).animate().fadeIn(delay: 600.ms),
+                Expanded(child: _roleCard('guardian', '👨‍👩‍👧', 'Guardian', 'Parents ke liye')),
+                const SizedBox(width: 12),
+                Expanded(child: _roleCard('child', '👦', 'Child', 'Bachon ke liye')),
               ],
             ),
-          ),
+            const SizedBox(height: 24),
+            _field(_nameCtrl, 'Naam', Icons.person_outline),
+            const SizedBox(height: 14),
+            _field(_emailCtrl, 'Email', Icons.email_outlined),
+            const SizedBox(height: 14),
+            _field(_passCtrl, 'Password', Icons.lock_outline, obscure: true),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity, height: 54,
+              child: ElevatedButton(
+                onPressed: _loading ? null : _signup,
+                child: _loading ? const CircularProgressIndicator(color: Colors.white) : const Text('Register', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _roleCard(String role, String emoji, String title, String subtitle) {
+    final selected = _role == role;
+    return GestureDetector(
+      onTap: () => setState(() => _role = role),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: selected ? AppTheme.primary.withOpacity(0.2) : AppTheme.cardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: selected ? AppTheme.primary : Colors.white12, width: selected ? 2 : 1),
+        ),
+        child: Column(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 32)),
+            const SizedBox(height: 8),
+            Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _field(TextEditingController ctrl, String hint, IconData icon, {bool obscure = false}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
+      ),
+      child: TextField(
+        controller: ctrl,
+        obscureText: obscure,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(color: Colors.white38),
+          prefixIcon: Icon(icon, color: AppTheme.primary),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 16),
         ),
       ),
     );

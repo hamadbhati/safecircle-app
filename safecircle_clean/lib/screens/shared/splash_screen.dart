@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../services/auth_service.dart';
 import '../../theme/app_theme.dart';
-import '../../theme/app_strings.dart';
-import '../auth/language_screen.dart';
+import '../auth/login_screen.dart';
+import '../guardian/guardian_dashboard.dart';
+import '../child/child_home.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -15,121 +18,55 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const LanguageScreen()),
-        );
-      }
-    });
+    _navigate();
+  }
+
+  Future<void> _navigate() async {
+    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    final auth = context.read<AuthService>();
+    await auth.loadUser();
+    if (!mounted) return;
+    if (auth.currentUser == null) {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+    } else if (auth.userModel?.role == 'guardian') {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const GuardianDashboard()));
+    } else {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const ChildHome()));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(gradient: AppTheme.bgGradient),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Logo Circle
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: AppTheme.primaryGradient,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.accentBlue.withOpacity(0.5),
-                      blurRadius: 30,
-                      spreadRadius: 10,
-                    ),
-                  ],
+      backgroundColor: AppTheme.darkBg,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  colors: [AppTheme.primary, AppTheme.secondary],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                child: const Icon(
-                  Icons.shield_rounded,
-                  size: 60,
-                  color: Colors.white,
-                ),
-              )
-                  .animate()
-                  .fadeIn(duration: 800.ms)
-                  .scale(begin: const Offset(0.5, 0.5)),
-
-              const SizedBox(height: 24),
-
-              // App Name
-              Text(
-                'SafeCircle',
-                style: TextStyle(
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
-                  foreground: Paint()
-                    ..shader = AppTheme.primaryGradient.createShader(
-                      const Rect.fromLTWH(0, 0, 200, 70),
-                    ),
-                ),
-              )
-                  .animate()
-                  .fadeIn(delay: 400.ms, duration: 600.ms)
-                  .slideY(begin: 0.3, end: 0),
-
-              const SizedBox(height: 8),
-
-              // Tagline
-              Text(
-                'Apnon Ki Hifazat • Protect Your Loved Ones',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppTheme.grey,
-                  letterSpacing: 0.5,
-                ),
-                textAlign: TextAlign.center,
-              )
-                  .animate()
-                  .fadeIn(delay: 700.ms, duration: 600.ms),
-
-              const SizedBox(height: 60),
-
-              // Loading indicator
-              SizedBox(
-                width: 150,
-                child: LinearProgressIndicator(
-                  backgroundColor: AppTheme.mediumBg,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.accentBlue),
-                ),
-              ).animate().fadeIn(delay: 1000.ms),
-
-              const SizedBox(height: 60),
-
-              // Datanura AI branding
-              Column(
-                children: [
-                  Text(
-                    'Powered by',
-                    style: TextStyle(fontSize: 11, color: AppTheme.grey),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Datanura AI',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.accentCyan,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                  Text(
-                    'Advanced Intelligence • Unified Systems',
-                    style: TextStyle(fontSize: 10, color: AppTheme.grey),
-                  ),
-                ],
-              ).animate().fadeIn(delay: 1200.ms),
-            ],
-          ),
+                boxShadow: [BoxShadow(color: AppTheme.primary.withOpacity(0.5), blurRadius: 30, spreadRadius: 5)],
+              ),
+              child: const Icon(Icons.shield, color: Colors.white, size: 50),
+            ).animate().scale(duration: 600.ms, curve: Curves.elasticOut).fadeIn(),
+            const SizedBox(height: 24),
+            const Text('SafeCircle', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 2))
+                .animate().fadeIn(delay: 300.ms).slideY(begin: 0.3),
+            const SizedBox(height: 8),
+            const Text('by Datanura AI', style: TextStyle(fontSize: 14, color: Colors.white54))
+                .animate().fadeIn(delay: 500.ms),
+            const SizedBox(height: 48),
+            const CircularProgressIndicator(color: AppTheme.primary).animate().fadeIn(delay: 800.ms),
+          ],
         ),
       ),
     );
