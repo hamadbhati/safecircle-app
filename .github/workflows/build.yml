@@ -28,11 +28,12 @@ jobs:
           flutter-version: '3.24.0'
           channel: 'stable'
           cache: true
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
       - name: Install Android SDK platform
-        run: sdkmanager "platforms;android-35" "build-tools;34.0.0"
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
       - name: Create assets directory
         run: mkdir -p assets/images
@@ -40,18 +41,16 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
-      - name: Scaffold android folder
+      - name: Generate android folder
         run: |
-          if [ ! -d "android" ]; then
-            flutter create --project-name safecircle \
-                           --org com.safecircle \
-                           --platforms android \
-                           . --overwrite
-          fi
+          flutter create --project-name safecircle --org com.safecircle --platforms android . --overwrite
+
+      - name: Copy google-services.json
+        run: cp android/app/google-services.json android/app/google-services.json.bak || true
 
       - name: Patch project build.gradle
         run: |
-          cat > android/build.gradle << 'EOF'
+          cat > android/build.gradle << 'GRADLE'
           buildscript {
               ext.kotlin_version = '1.9.22'
               repositories {
@@ -80,11 +79,11 @@ jobs:
           tasks.register("clean", Delete) {
               delete rootProject.buildDir
           }
-          EOF
+          GRADLE
 
       - name: Patch app build.gradle
         run: |
-          cat > android/app/build.gradle << 'EOF'
+          cat > android/app/build.gradle << 'GRADLE'
           plugins {
               id "com.android.application"
               id "kotlin-android"
@@ -119,26 +118,27 @@ jobs:
           flutter {
               source '../..'
           }
-          EOF
+          GRADLE
 
       - name: Set Gradle version
         run: |
           mkdir -p android/gradle/wrapper
-          cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          cat > android/gradle/wrapper/gradle-wrapper.properties << 'GRADLE'
           distributionBase=GRADLE_USER_HOME
           distributionPath=wrapper/dists
           zipStoreBase=GRADLE_USER_HOME
           zipStorePath=wrapper/dists
           distributionUrl=https\://services.gradle.org/distributions/gradle-8.10.2-bin.zip
-          EOF
+          GRADLE
 
       - name: Write google-services.json
-        env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+        run: |
+          cat > android/app/google-services.json << 'JSON'
+          {"project_info":{"project_number":"836286896118","project_id":"safecircle-1eb54","storage_bucket":"safecircle-1eb54.firebasestorage.app"},"client":[{"client_info":{"mobilesdk_app_id":"1:836286896118:android:e607150517ff9b93ad19d7","android_client_info":{"package_name":"com.safecircle.app"}},"oauth_client":[],"api_key":[{"current_key":"AIzaSyARw8lHBUbatCffr-Y5q8uhhUhCP32s7Ew"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}
+          JSON
 
       - name: Build APK
-        run: flutter build apk --debug --verbose
+        run: flutter build apk --debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
