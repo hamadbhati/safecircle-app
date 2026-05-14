@@ -1,1 +1,48 @@
-{"project_info":{"project_number":"836286896118","project_id":"safecircle-1eb54","storage_bucket":"safecircle-1eb54.firebasestorage.app"},"client":[{"client_info":{"mobilesdk_app_id":"1:836286896118:android:e607150517ff9b93ad19d7","android_client_info":{"package_name":"com.safecircle.app"}},"oauth_client":[],"api_key":[{"current_key":"AIzaSyARw8lHBUbatCffr-Y5q8uhhUhCP32s7Ew"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}
+{
+  "project_info": {
+    "project_number": "836286896118",
+    "project_id": "safecircle-1eb54",
+    "storage_bucket": "safecircle-1eb54.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:836286896118:android:e607150517ff9b93ad19d7",
+        "android_client_info": {
+          "package_name": "com.safecircle.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyARw8lHBUbatCffr-Y5q8uhhUhCP32s7Ew"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:836286896118:android:d4986ef6fdc7300ead19d7",
+        "android_client_info": {
+          "package_name": "com.safecircle.safecircle"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyARw8lHBUbatCffr-Y5q8uhhUhCP32s7Ew"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
